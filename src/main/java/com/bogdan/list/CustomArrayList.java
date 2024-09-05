@@ -1,7 +1,5 @@
 package com.bogdan.list;
 
-import com.bogdan.util.ArrayLengthUtil;
-
 import java.util.*;
 
 /**
@@ -22,6 +20,17 @@ public class CustomArrayList<T> implements SimpleList<T> {
      * Устанавливается если емкость равняется 0.
      */
     private static final Object[] EMPTY_ELEMENTS = {};
+    /**
+     * Мягкая максимальная длина массива, ограничение которое накладывается для вычисления роста массива.
+     * Некоторые JVM имеют ограничение реализации, которое приведет
+     * к возникновению ошибки OutOfMemoryError("Запрашиваемый размер массива превышает лимит виртуальной машины"),
+     * если делается запрос на выделение массива некоторой длины около Integer.MAX_VALUE,
+     * даже если имеется достаточная куча. Фактическое ограничение может зависеть от некоторых
+     * характеристик реализации JVM, таких как размер заголовка объекта. Мягкое максимальное
+     * значение выбирается консервативно, чтобы быть меньше любого ограничения реализации,
+     * которое, вероятно, встретится.
+     */
+    private static final int SOFT_MAX_ARRAY_LENGTH = Integer.MAX_VALUE - 8;
     /**
      * Внутренний массив для хранения списка элементов
      */
@@ -121,11 +130,27 @@ public class CustomArrayList<T> implements SimpleList<T> {
         if (capacity > elements.length) {
             int oldCapacity = elements.length;
             Object[] oldElements = this.elements;
-            int newSize = ArrayLengthUtil.newLength(oldCapacity,
+            int newSize = newLength(oldCapacity,
                     capacity - oldCapacity,
                     oldCapacity >> 1);
             this.elements = Arrays.copyOf(oldElements, newSize);
         }
+    }
+    private int newLength(int oldLength,int minGrowth, int prefGrowth){
+        int prefLength = oldLength + Math.max(minGrowth, prefGrowth);
+        if(0 < prefLength && prefLength <= SOFT_MAX_ARRAY_LENGTH){
+            return prefLength;
+        } else {
+            return hugeLength(oldLength,minGrowth);
+        }
+    }
+
+    private int hugeLength(int oldLength, int minGrowth) {
+        int minLength = oldLength + minGrowth;
+        if (minLength < 0) {
+            throw new OutOfMemoryError(
+                    "Required array length " + oldLength + " + " + minGrowth + " is too large");
+        } else return Math.max(minLength, SOFT_MAX_ARRAY_LENGTH);
     }
 
     private void checkRange(int index) {
